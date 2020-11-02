@@ -1,0 +1,27 @@
+Assam - Aggregator of lemons
+
+* Installation
+
+Install the master build of Zig, then run =$ zig build install -Drelease-safe --prefix DIST=, and then add =DIST/bin= to =$PATH=.
+DIST can be, for example, =/usr/local= or =~/.local/=.
+
+* Usage
+
+My setup:
+
+#+begin_src shell
+$ assam | lemonbar -f "JetBrains Mono:size=14" -f "Symbols Nerd Font:size=18" -B "#1d1f21" -o 1 -u 3
+#+end_src
+
+* Rationale
+
+There is none. This does not need to exist. There are other ways to do this. I repeat. There is no reason for the existence of this project.
+
+* Todos
+** On startup, get focused windows on all monitors
+** Fiddle with colors
+** Blocks
+*** Keyboard layout
+*** Brightness
+*** Volume
+*** Internet connection
