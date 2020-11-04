@@ -98,26 +98,31 @@ const SystemState = struct {
         while (it.next()) |pair| {
             try writer.print("%{{S{}}}%{{l}} {} ", .{ pair.value.id, pair.key });
 
-            // Format current monitor
-            if (pair.value.id == self.last_monitor) {}
-            // Format other monitors
-            else {}
+            const is_selected = pair.value.id == self.last_monitor;
 
             if (self.monitor_data_map.get(pair.value.id)) |data| {
                 for (data.desktops.items) |desk| {
                     if (desk.focused) {
-                        try writer.writeAll("%{R}");
+                        if (is_selected) {
+                            try writer.writeAll("%{F" ++ BLUE ++ "}%{R}");
+                        } else {
+                            try writer.writeAll("%{+u}");
+                        }
                     }
                     defer if (desk.focused) {
-                        writer.writeAll("%{R}") catch {};
+                        if (is_selected) {
+                            writer.writeAll("%{R}%{F-}") catch {};
+                        } else {
+                            writer.writeAll("%{-u}") catch {};
+                        }
                     };
                     if (!desk.empty) {
-                        try writer.writeAll(" %{+u}");
+                        try writer.writeAll(" %{+o}");
                     } else {
                         try writer.writeByte(' ');
                     }
                     defer if (!desk.empty) {
-                        writer.writeAll("%{-u} ") catch {};
+                        writer.writeAll("%{-o} ") catch {};
                     } else {
                         writer.writeByte(' ') catch {};
                     };
@@ -127,7 +132,11 @@ const SystemState = struct {
                     }
                     try writer.print("{}", .{correct_name});
                 }
-                try writer.print(" %{{B" ++ GRAY ++ "}} {} ", .{data.focused_title});
+                if (is_selected) {
+                    try writer.print(" %{{F" ++ BLUE ++ "}}%{{R}} {} %{{R}}%{{F-}}", .{data.focused_title});
+                } else {
+                    try writer.print(" %{{B" ++ GRAY ++ "}} {} ", .{data.focused_title});
+                }
             }
 
             if (self.date) |d| {
