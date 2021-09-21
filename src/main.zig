@@ -11,6 +11,7 @@ const Children = enum {
     xtitle,
     bspc,
     date,
+    battery,
 };
 
 const MonitorId = u8;
@@ -47,6 +48,8 @@ const SystemState = struct {
     last_monitor: u8 = 0,
     // Own
     date: ?[]const u8 = null,
+    // Own
+    battery: ?[]const u8 = null,
 
     const Self = @This();
 
@@ -140,6 +143,11 @@ const SystemState = struct {
             }
 
             try writer.writeAll("%{r}%{B-}");
+
+            if (self.battery) |b| {
+                try writer.writeAll(b);
+                try writer.writeAll("% ");
+            }
 
             if (self.date) |d| {
                 try writer.writeAll(d);
@@ -265,6 +273,14 @@ pub fn main() anyerror!void {
             \\done
         },
     );
+    try el.queueStdoutOfChild(.battery, &[_][]const u8{
+        "sh",
+        "-c",
+        \\while :
+        \\ do cat /sys/class/power_supply/*/capacity
+        \\ sleep 30
+        \\done
+    });
 
     try el.spawn();
 
@@ -329,6 +345,12 @@ pub fn main() anyerror!void {
                     }
                     state.date = msg.line.toOwnedSlice();
                     // std.log.debug("Time: {}", .{msg.line.items});
+                },
+                .battery => {
+                    if (state.battery) |b| {
+                        allocator.free(b);
+                    }
+                    state.battery = msg.line.toOwnedSlice();
                 },
             }
             try state.format(&stdout);
