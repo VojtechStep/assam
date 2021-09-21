@@ -54,7 +54,7 @@ const SystemState = struct {
         {
             var it = self.monitor_map.iterator();
             while (it.next()) |pair| {
-                allocator.free(pair.key);
+                allocator.free(pair.key_ptr.*);
             }
             self.monitor_map.deinit();
         }
@@ -62,11 +62,11 @@ const SystemState = struct {
         {
             var it = self.monitor_data_map.iterator();
             while (it.next()) |pair| {
-                allocator.free(pair.value.focused_title);
-                for (pair.value.desktops.items) |d| {
+                allocator.free(pair.value_ptr.focused_title);
+                for (pair.value_ptr.desktops.items) |d| {
                     allocator.free(d.name);
                 }
-                pair.value.desktops.deinit();
+                pair.value_ptr.desktops.deinit();
             }
             self.monitor_data_map.deinit();
         }
@@ -79,12 +79,12 @@ const SystemState = struct {
     pub fn ensure_monitor_data(self: *Self, monitor: MonitorId, allocator: *Allocator) !*MonitorData {
         var data_result = try self.monitor_data_map.getOrPut(monitor);
         if (!data_result.found_existing) {
-            data_result.entry.value = .{
+            data_result.value_ptr.* = .{
                 .desktops = std.ArrayList(Desktop).init(allocator),
                 .focused_title = try allocator.alloc(u8, 0),
             };
         }
-        return &data_result.entry.value;
+        return data_result.value_ptr;
     }
 
     pub fn format(self: *Self, buf_writer: anytype) !void {
@@ -96,11 +96,11 @@ const SystemState = struct {
 
         // Print text on all monitors
         while (it.next()) |pair| {
-            try writer.print("%{{S{}}}%{{l}} {} ", .{ pair.value.id, pair.key });
+            try writer.print("%{{S{}}}%{{l}} {s} ", .{ pair.value_ptr.id, pair.key_ptr.* });
 
-            const is_selected = pair.value.id == self.last_monitor;
+            const is_selected = pair.value_ptr.id == self.last_monitor;
 
-            if (self.monitor_data_map.get(pair.value.id)) |data| {
+            if (self.monitor_data_map.get(pair.value_ptr.id)) |data| {
                 for (data.desktops.items) |desk| {
                     if (desk.focused) {
                         if (is_selected) {
@@ -130,17 +130,20 @@ const SystemState = struct {
                     if (std.mem.indexOfScalar(u8, correct_name, '_')) |i| {
                         correct_name = correct_name[i + 1 ..];
                     }
-                    try writer.print("{}", .{correct_name});
+                    try writer.print("{s}", .{correct_name});
                 }
                 if (is_selected) {
-                    try writer.print(" %{{F" ++ BLUE ++ "}}%{{R}} {} %{{R}}%{{F-}}", .{data.focused_title});
+                    try writer.print(" %{{F" ++ BLUE ++ "}}%{{R}} {s} %{{R}}%{{F-}}", .{data.focused_title});
                 } else {
-                    try writer.print(" %{{B" ++ GRAY ++ "}} {} ", .{data.focused_title});
+                    try writer.print(" %{{B" ++ GRAY ++ "}} {s} ", .{data.focused_title});
                 }
             }
 
+            try writer.writeAll("%{r}%{B-}");
+
             if (self.date) |d| {
-                try writer.print("%{{r}}%{{B-}}{} ", .{d});
+                try writer.writeAll(d);
+                try writer.writeByte(' ');
             }
         }
 
@@ -219,7 +222,7 @@ pub fn main() anyerror!void {
         errdefer {
             var err_mon_it = monitor_map.iterator();
             while (err_mon_it.next()) |pair| {
-                allocator.free(pair.key);
+                allocator.free(pair.key_ptr.*);
             }
             monitor_map.deinit();
         }

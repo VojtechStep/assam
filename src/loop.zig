@@ -53,9 +53,9 @@ pub fn Loop(comptime Tags: anytype) type {
 
             var it = self.process_map.iterator();
             while (it.next()) |e| {
-                const r = e.value.process.kill() catch @panic("Error killing process");
+                const r = e.value_ptr.process.kill() catch @panic("Error killing process");
                 // std.log.debug("Kill status: {}", .{r});
-                e.value.process.deinit();
+                e.value_ptr.process.deinit();
             }
             self.process_map.deinit();
             os.close(self.efd);
@@ -102,7 +102,7 @@ pub fn Loop(comptime Tags: anytype) type {
             const fd = entry.process.stdout.?.handle;
 
             try self.process_map.putNoClobber(fd, entry);
-            errdefer _ = self.process_map.remove(fd) orelse unreachable;
+            errdefer _ = self.process_map.fetchRemove(fd) orelse unreachable;
 
             var add_event = os.epoll_event{
                 .events = os.EPOLLIN,
