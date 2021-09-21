@@ -260,7 +260,7 @@ pub fn main() anyerror!void {
             "sh",
             "-c",
             \\while :
-            \\  do date +%H:%M
+            \\  do date "+%a, %b %d %H:%M"
             \\  sleep 30
             \\done
         },
