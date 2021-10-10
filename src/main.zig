@@ -256,7 +256,7 @@ pub fn main() anyerror!void {
     defer el.deinit();
     try el.queueStdoutOfChild(
         .xtitle,
-        &[_][]const u8{ "xtitle", "-s" },
+        &[_][]const u8{ "xtitle", "-s", "-t", "500" },
     );
     try el.queueStdoutOfChild(
         .bspc,
