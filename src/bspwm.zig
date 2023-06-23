@@ -50,7 +50,7 @@ pub const Report = union(enum) {
         UnknownNodeFlag,
     };
 
-    pub fn deinit(self: *Self, allocator: *Allocator) void {
+    pub fn deinit(self: *Self, allocator: Allocator) void {
         switch (self.*) {
             .monitor => |m| {
                 allocator.free(m.name);
@@ -62,7 +62,7 @@ pub const Report = union(enum) {
         }
     }
 
-    pub fn parse(allocator: *Allocator, str: []const u8) (ParseError || Allocator.Error)!Report {
+    pub fn parse(allocator: Allocator, str: []const u8) (ParseError || Allocator.Error)!Report {
         if (str.len < 1) {
             return error.UnknownReportType;
         }
@@ -129,7 +129,7 @@ pub const Report = union(enum) {
         };
     }
 
-    pub fn parse_report(allocator: *Allocator, report: []const u8) !std.ArrayList(Report) {
+    pub fn parse_report(allocator: Allocator, report: []const u8) !std.ArrayList(Report) {
         var list = std.ArrayList(Report).init(allocator);
 
         errdefer list.deinit();
@@ -137,7 +137,7 @@ pub const Report = union(enum) {
             return list;
         }
 
-        var it = mem.tokenize(report[1..], ":");
+        var it = mem.tokenize(u8, report[1..], ":");
 
         while (it.next()) |part| {
             if (Report.parse(allocator, part)) |rep| {

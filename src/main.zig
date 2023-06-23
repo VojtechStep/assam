@@ -45,7 +45,7 @@ const SystemState = struct {
     // Monitor id -> Monitor data
     // Own
     monitor_data_map: std.AutoHashMap(MonitorId, MonitorData),
-    last_monitor: u8 = 0,
+    last_monitor: ?MonitorId = 0,
     // Own
     date: ?[]const u8 = null,
     // Own
@@ -53,7 +53,7 @@ const SystemState = struct {
 
     const Self = @This();
 
-    pub fn deinit(self: *Self, allocator: *Allocator) void {
+    pub fn deinit(self: *Self, allocator: Allocator) void {
         {
             var it = self.monitor_map.iterator();
             while (it.next()) |pair| {
@@ -77,9 +77,13 @@ const SystemState = struct {
         if (self.date) |d| {
             allocator.free(d);
         }
+
+        if (self.battery) |b| {
+            allocator.free(b);
+        }
     }
 
-    pub fn ensure_monitor_data(self: *Self, monitor: MonitorId, allocator: *Allocator) !*MonitorData {
+    pub fn ensure_monitor_data(self: *Self, monitor: MonitorId, allocator: Allocator) !*MonitorData {
         var data_result = try self.monitor_data_map.getOrPut(monitor);
         if (!data_result.found_existing) {
             data_result.value_ptr.* = .{
@@ -161,6 +165,7 @@ const SystemState = struct {
 };
 
 fn monitor_lessthan(context: void, lhs: Monitor, rhs: Monitor) bool {
+    _ = context;
     if (lhs.x < rhs.x or lhs.y + lhs.height <= rhs.y) {
         return true;
     }
@@ -173,7 +178,7 @@ pub fn main() anyerror!void {
         .stack_trace_frames = 10,
     }){};
     defer _ = gpa.deinit();
-    var allocator = &gpa.allocator;
+    var allocator = gpa.allocator();
 
     var state = st: {
         // Seed the monitor state. Replicate the sorting logic of lemonbar
@@ -198,7 +203,7 @@ pub fn main() anyerror!void {
         defer monitor_name_list.deinit();
 
         // Get the data as lists
-        var stdout_it = std.mem.tokenize(monitor_seed_proc.stdout, "\n ");
+        var stdout_it = std.mem.tokenize(u8, monitor_seed_proc.stdout, "\n ");
         var monitor_id: u8 = 0;
         while (stdout_it.next()) |mon_name| {
             const w = try std.fmt.parseInt(u32, stdout_it.next().?, 10);
@@ -282,26 +287,40 @@ pub fn main() anyerror!void {
         \\done
     });
 
-    try el.spawn();
+    {
+        var remaining_processes: usize = 0;
+        var attempts: usize = 0;
+        while (attempts < 5) : (attempts += 1) {
+            remaining_processes = try el.spawn();
+            if (remaining_processes == 0) {
+                break;
+            }
+        } else {
+            return error.CouldNotSpawnProcesses;
+        }
+    }
 
     {
         var stdout = std.io.bufferedWriter(std.io.getStdOut().writer());
         var iter = try el.lines();
         defer iter.deinit();
 
-        while (iter.next()) |*msg| {
+        var line = iter.next();
+        while (line) |*msg| : (line = iter.next()) {
+            // while (iter.next()) |*msg| {
             defer msg.line.deinit();
 
             switch (msg.tag) {
                 .xtitle => {
                     // parse xtitle
-                    var data = try state.ensure_monitor_data(state.last_monitor, allocator);
-                    allocator.free(data.focused_title);
-                    data.focused_title = msg.line.toOwnedSlice();
+                    if (state.last_monitor) |last_monitor| {
+                        var data = try state.ensure_monitor_data(last_monitor, allocator);
+                        allocator.free(data.focused_title);
+                        data.focused_title = msg.line.toOwnedSlice();
+                    }
                 },
                 .bspc => {
                     // parse bspc
-                    // std.log.debug("WM update: {}", .{line});
                     const report = bspwm.Report.parse_report(allocator, msg.line.items) catch continue;
                     var last_seen_monitor = state.last_monitor;
                     defer report.deinit();
@@ -309,17 +328,21 @@ pub fn main() anyerror!void {
                         switch (part.*) {
                             .monitor => |m| {
                                 defer part.deinit(allocator);
+                                // TODO: handle changes in monitor configurations
+                                // -> need to update monitor_map
                                 const id = state.monitor_map.get(m.name).?.id;
-                                var data = state.ensure_monitor_data(id, allocator);
+                                _ = try state.ensure_monitor_data(id, allocator);
                                 last_seen_monitor = id;
                                 if (m.focused) {
                                     state.last_monitor = id;
                                 }
                             },
                             .desktop => |d| {
-                                var data = try state.ensure_monitor_data(last_seen_monitor, allocator);
+                                // XXX: Verify the assumption that a desktop can only be reported
+                                // after a monitor is reported
+                                var data = try state.ensure_monitor_data(last_seen_monitor.?, allocator);
                                 var desktop = desk: {
-                                    for (data.desktops.items) |*desk, i| {
+                                    for (data.desktops.items) |*desk| {
                                         if (std.mem.eql(u8, desk.name, d.name)) {
                                             part.deinit(allocator);
                                             break :desk desk;
@@ -344,7 +367,6 @@ pub fn main() anyerror!void {
                         allocator.free(d);
                     }
                     state.date = msg.line.toOwnedSlice();
-                    // std.log.debug("Time: {}", .{msg.line.items});
                 },
                 .battery => {
                     if (state.battery) |b| {
