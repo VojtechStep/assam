@@ -28,7 +28,9 @@
         packages.default = selfPkgs.assam;
         packages.assam = pkgs.callPackage
           ({ stdenvNoCC
+           , lib
            , zig
+           , makeWrapper
            , bspwm
            , xtitle
            }:
@@ -37,12 +39,7 @@
               version = "0.1.0";
               src = self;
 
-              nativeBuildInputs = [ zig ];
-
-              buildInputs = [
-                xtitle
-                bspwm
-              ];
+              nativeBuildInputs = [ zig makeWrapper ];
 
               dontConfigure = true;
 
@@ -50,6 +47,11 @@
                 runHook preInstall
                 zig build -Drelease-safe -Dcpu=baseline --prefix $out install
                 runHook postInstall
+              '';
+
+              postInstall = ''
+                wrapProgram $out/bin/assam \
+                  --prefix PATH : ${lib.makeBinPath [ xtitle bspwm ]}
               '';
             })
           { };
