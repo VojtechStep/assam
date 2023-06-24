@@ -288,6 +288,7 @@ pub fn main() anyerror!void {
     });
 
     {
+        std.log.debug("Starting loop", .{});
         var remaining_processes: usize = 0;
         var attempts: usize = 0;
         while (attempts < 5) : (attempts += 1) {
@@ -298,6 +299,7 @@ pub fn main() anyerror!void {
         } else {
             return error.CouldNotSpawnProcesses;
         }
+        std.log.debug("Spawned all processes", .{});
     }
 
     {

@@ -47,7 +47,18 @@ pub fn Loop(comptime Tags: anytype) type {
 
             var it = self.process_map.iterator();
             while (it.next()) |e| {
-                const r = e.value_ptr.process.kill() catch @panic("Error killing process");
+                const r = e.value_ptr.process.kill() catch |kill_error| {
+                    switch (kill_error) {
+                        error.FileNotFound => {
+                            std.log.warn("Could not find executable {}", .{e.value_ptr.tag});
+                        },
+                        else => {
+                            std.log.err("Kill error: {} {}", .{ e.value_ptr.tag, kill_error });
+                            @panic("Error killing process");
+                        },
+                    }
+                    continue;
+                };
                 std.log.debug("Kill status: {}", .{r});
             }
             self.process_map.deinit();
