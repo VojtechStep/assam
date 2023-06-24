@@ -173,7 +173,6 @@ fn monitor_lessthan(context: void, lhs: Monitor, rhs: Monitor) bool {
 }
 
 pub fn main() anyerror!void {
-    std.io.getStdErr().close();
     var gpa = std.heap.GeneralPurposeAllocator(.{
         .stack_trace_frames = 10,
     }){};
