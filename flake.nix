@@ -43,6 +43,10 @@
 
               dontConfigure = true;
 
+              buildPhase = ''
+                export HOME=$TMPDIR
+              '';
+
               installPhase = ''
                 runHook preInstall
                 zig build -Drelease-safe -Dcpu=baseline --prefix $out install
